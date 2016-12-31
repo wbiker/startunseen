@@ -15,6 +15,9 @@ mythbusterspath = /home/wolf/vids/mythbusters
 END
 
 my %config = Config.load($config-file-content);
+my $download-dir = %config<download-dir>.IO;
+my $bigbang-dir = %config<bigbangpath>.IO;
+my $mythbusters-dir = %config<mythbusterspath>.IO;
 
 multi MAIN() {
     start(); 
@@ -25,25 +28,25 @@ multi MAIN(Str $help where * ~~ /'-h'|'--help'/) {
 }
 
 multi MAIN('rename', Bool \debug = False) {
-    if %config<download-dir>.IO !~~ :e {
-        warn "{%config<download-dir>} has not be mounted";
+    if $download-dir !~~ :e {
+        warn "$download-dir has not be mounted";
     }
     rename-movies(); 
 }
 
 multi MAIN('copy-new', Bool \debug = False) {
-    if %config<download-dir>.IO !~~ :e {
-        warn "{%config<download-dir>} has not be mounted";
+    if $download-dir !~~ :e {
+        warn "$download-dir has not be mounted";
     }
     copy-new();
 }
 
 multi MAIN('latest-vid', Bool \debug = False) {
-    my $searcher = FileSys::Searcher.new(path => %config<bigbangpath>);
+    my $searcher = FileSys::Searcher.new(path => $bigbang-dir);
     my $latest-movie = $searcher.getLastMovie();
     say $latest-movie.name;
 
-    my $seamb = FileSys::Searcher.new(path => %config<mythbusterspath>);
+    my $seamb = FileSys::Searcher.new(path => $mythbusters-dir);
     my @mb = $seamb.getMovies();
 
     say (@mb.sort({ .series && .episode }))[*-1].name;
@@ -65,14 +68,12 @@ sub rename-movies {
 }
 
 sub copy-new {
-    my $bb_path = %config<bigbangpath>;
-    my $mb_path = %config<mythbusterspath>;
    # get the youngest local
-   my $searcher = FileSys::Searcher.new(path => $bb_path);
+   my $searcher = FileSys::Searcher.new(path => $bigbang-dir);
     my $bb-latest = $searcher.getLastMovie();
     say "latest bbt is ", $bb-latest.name;
 
-    my $searcher_mb = FileSys::Searcher.new(path => $mb_path);
+    my $searcher_mb = FileSys::Searcher.new(path => $mythbusters-dir);
     my $mb-latest = $searcher_mb.getLastMovie();
     say "latest mb is ", $mb-latest.name;
     # fetch all files
@@ -83,13 +84,13 @@ sub copy-new {
     for @remote-bb -> $movie {
         if $bb-latest.series < $movie.series {
             say "Found newer season: ", $movie.name;
-            my $newbbname = $*SPEC.catfile($bb_path, $movie.name);
+            my $newbbname = $*SPEC.catfile($bigbang-dir, $movie.name);
             say $newbbname;
             $movie.io.copy($newbbname);
         }
         elsif $bb-latest.series == $movie.series and $bb-latest.episode < $movie.episode {
             say "Found new bb epsiode; ", $movie.name;
-            my $newbbname = $*SPEC.catfile($bb_path, $movie.name);
+            my $newbbname = $*SPEC.catfile($bigbang-dir, $movie.name);
             say $newbbname;
             $movie.io.copy($newbbname);
         }
@@ -101,13 +102,13 @@ sub copy-new {
     for @remote-mb -> $mv {
         if $mb-latest.series < $mv.series {
             say "Found newer season: ", $mv.name;
-            my $newbmname = $*SPEC.catfile($mb_path, $mv.name);
+            my $newbmname = $*SPEC.catfile($mythbusters-dir, $mv.name);
             say $newbmname;
             $mv.io.copy($newbmname);
         }
         elsif $mb-latest.series == $mv.series and $mb-latest.episode < $mv.episode {
             say "Found new mb episode ", $mv.name;
-            my $newbmname = $*SPEC.catfile($mb_path, $mv.name);
+            my $newbmname = $*SPEC.catfile($mythbusters-dir, $mv.name);
             say $newbmname;
             $mv.io.copy($newbmname);
         }
