@@ -4,43 +4,46 @@ use v6;
 use lib "/home/wolf/repos/startunseen/lib";
 use FileSys::Searcher;
 use FileSys::Movie;
+use Config;
 
-my $download-dir = "/mnt/download".IO;
-my $debug = True;
+my $config-file-content = q:to/END/;
+# config file for startunseen script
+download-dir = /mnt/downloads
+debug = 1
+bigbangpath = /home/wolf/vids/bigbangtheory
+mythbusterspath = /home/wolf/vids/mythbusters
+END
 
-my %config = (
-    download-dir => '/mnt/download'.IO,
-    debug => True,
-);
+my %config = Config.load($config-file-content);
 
 multi MAIN() {
     start(); 
 }
 
-multi MAIN('help') {
+multi MAIN(Str $help where * ~~ /'-h'|'--help'/) {
     help();
 }
 
 multi MAIN('rename', Bool \debug = False) {
-    if %config<download-dir> !~~ :e {
-        warn "/mnt/nas/download has not be mounted";
+    if %config<download-dir>.IO !~~ :e {
+        warn "{%config<download-dir>} has not be mounted";
     }
     rename-movies(); 
 }
 
 multi MAIN('copy-new', Bool \debug = False) {
-    if $download-dir !~~ :e {
-        die "$download-dir not mounted";
+    if %config<download-dir>.IO !~~ :e {
+        warn "{%config<download-dir>} has not be mounted";
     }
     copy-new();
 }
 
 multi MAIN('latest-vid', Bool \debug = False) {
-    my $searcher = FileSys::Searcher.new(path => "/home/wolf/vids/bigbangtheory");
+    my $searcher = FileSys::Searcher.new(path => %config<bigbangpath>);
     my $latest-movie = $searcher.getLastMovie();
     say $latest-movie.name;
 
-    my $seamb = FileSys::Searcher.new(path => "/home/wolf/vids/mythbusters");
+    my $seamb = FileSys::Searcher.new(path => %config<mythbusterspath>);
     my @mb = $seamb.getMovies();
 
     say (@mb.sort({ .series && .episode }))[*-1].name;
@@ -62,8 +65,8 @@ sub rename-movies {
 }
 
 sub copy-new {
-    my $bb_path = "/home/wolf/vids/bigbangtheory";
-    my $mb_path = "/home/wolf/vids/mythbusters";
+    my $bb_path = %config<bigbangpath>;
+    my $mb_path = %config<mythbusterspath>;
    # get the youngest local
    my $searcher = FileSys::Searcher.new(path => $bb_path);
     my $bb-latest = $searcher.getLastMovie();
@@ -174,5 +177,8 @@ OPTION
     copy-new: copy new videos
     latest-vid: shows the oldest vids
     rename: shows all movies with not recognized series/episodes
+
+CONFIGURATION
+    To set the path variables check out $*HOME/.config/startunseen/config
 HELP
 }
