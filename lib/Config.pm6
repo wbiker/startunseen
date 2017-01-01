@@ -8,7 +8,7 @@ method load($config-file-default-content) {
     my $config-program-dir = $*SPEC.catdir($config-dir, $*PROGRAM.basename);
     my $config-program-file = $*SPEC.catfile($config-program-dir, 'config').IO;
 
-    $config-program-dir.mkdir unless $config-program-dir.IO.e;
+    $config-program-dir.IO.mkdir unless $config-program-dir.IO.e;
 
     if not $config-program-file.e {
         # does not exist.
@@ -25,7 +25,22 @@ method load($config-file-default-content) {
         next if $line ~~ /^^ '#'/;
 
         if $line ~~ /$<key>=<-[=]>+ \s+ '=' \s+ $<value>=.*/ {
-            %config{$<key>} = ~$<value>;
+            my $key = ~$<key>;
+            my $value = ~$<value>;
+            if %config{$key}:exists {
+                my $tmp = %config{$key};
+                if $tmp ~~ Array {
+                    $tmp.push: $value;
+                    %config{$key} = $tmp;
+                }
+                else {
+                    my @new = ($tmp, $value);
+                    %config{$key} = @new;
+                }
+            }
+            else {
+                %config{$key} = $value;
+            }
         }
         else {
             die "Config $config-program-file file error: $line not recognized";

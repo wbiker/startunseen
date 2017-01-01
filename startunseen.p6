@@ -10,17 +10,18 @@ my $config-file-content = q:to/END/;
 # config file for startunseen script
 download-dir = /mnt/downloads
 debug = 1
-bigbangpath = /home/wolf/vids/bigbangtheory
-mythbusterspath = /home/wolf/vids/mythbusters
+# all search pathes will be used to look in for movie files.
+# the second string is used to find the particular movies in all one
+search-path = /home/wolf/vids/bigbangtheory;bang\.theory
+search-path = /home/wolf/vids/mythbusters;mythbuster
 END
 
 my %config = Config.load($config-file-content);
 my $download-dir = %config<download-dir>.IO;
-my $bigbang-dir = %config<bigbangpath>.IO;
-my $mythbusters-dir = %config<mythbusterspath>.IO;
+my $search-dirs = %config<search-path>;
 
 multi MAIN() {
-    start(); 
+    start();
 }
 
 multi MAIN(Str $help where * ~~ /'-h'|'--help'/) {
@@ -42,18 +43,36 @@ multi MAIN('copy-new', Bool \debug = False) {
 }
 
 multi MAIN('latest-vid', Bool \debug = False) {
-    my $searcher = FileSys::Searcher.new(path => $bigbang-dir);
-    my $latest-movie = $searcher.getLastMovie();
-    say $latest-movie.name;
+    for get-search-dirs() -> $search {
+        my ($search-dir) = $search.split(';');
+        say "Check $search-dir";
+        my $searcher = FileSys::Searcher.new(path => $search-dir);
+        my $latest-movie = $searcher.getLastMovie();
+        say $latest-movie.name;
+    }
 
-    my $seamb = FileSys::Searcher.new(path => $mythbusters-dir);
-    my @mb = $seamb.getMovies();
-
-    say (@mb.sort({ .series && .episode }))[*-1].name;
+    #say (@mb.sort({ .series && .episode }))[*-1].name;
 }
 
 sub USAGE() {
     help();
+}
+
+sub get-search-dirs() {
+    my @search-dirs-new;
+    if $search-dirs ~~ Array {
+        my @root = $search-dirs;
+        for @root -> @search-array {
+            for @search-array -> $array {
+                @search-dirs-new.push: $array;
+            }
+        }
+    }
+    else {
+        @search-dirs-new.push: $search-dirs;
+    }
+
+    @search-dirs-new;
 }
 
 sub rename-movies {
@@ -68,49 +87,30 @@ sub rename-movies {
 }
 
 sub copy-new {
-   # get the youngest local
-   my $searcher = FileSys::Searcher.new(path => $bigbang-dir);
-    my $bb-latest = $searcher.getLastMovie();
-    say "latest bbt is ", $bb-latest.name;
+    # get the youngest local
+    my $latest;
+    for get-search-dirs() -> $search {
+        my ($search-dir,$search-pattern) = $search.split(';');
+        my $searcher = FileSys::Searcher.new(path => $search-dir);
+        $latest = $searcher.getLastMovie();
+        say "latest in $search-dir is ", $latest.name;
+    
+        my $remote = FileSys::Searcher.new(path => $download-dir);
+        my @remote = $remote.getMovies($search-pattern);
 
-    my $searcher_mb = FileSys::Searcher.new(path => $mythbusters-dir);
-    my $mb-latest = $searcher_mb.getLastMovie();
-    say "latest mb is ", $mb-latest.name;
-    # fetch all files
-
-    my $remote-bb = FileSys::Searcher.new;
-    my @remote-bb = $remote-bb.getMovies("bang\.theory");
-
-    for @remote-bb -> $movie {
-        if $bb-latest.series < $movie.series {
-            say "Found newer season: ", $movie.name;
-            my $newbbname = $*SPEC.catfile($bigbang-dir, $movie.name);
-            say $newbbname;
-            $movie.io.copy($newbbname);
-        }
-        elsif $bb-latest.series == $movie.series and $bb-latest.episode < $movie.episode {
-            say "Found new bb epsiode; ", $movie.name;
-            my $newbbname = $*SPEC.catfile($bigbang-dir, $movie.name);
-            say $newbbname;
-            $movie.io.copy($newbbname);
-        }
-    }
-
-    my $remote-mb = FileSys::Searcher.new;
-    my @remote-mb = $remote-mb.getMovies("mythbusters");
-
-    for @remote-mb -> $mv {
-        if $mb-latest.series < $mv.series {
-            say "Found newer season: ", $mv.name;
-            my $newbmname = $*SPEC.catfile($mythbusters-dir, $mv.name);
-            say $newbmname;
-            $mv.io.copy($newbmname);
-        }
-        elsif $mb-latest.series == $mv.series and $mb-latest.episode < $mv.episode {
-            say "Found new mb episode ", $mv.name;
-            my $newbmname = $*SPEC.catfile($mythbusters-dir, $mv.name);
-            say $newbmname;
-            $mv.io.copy($newbmname);
+        for @remote -> $movie {
+            if $latest.series < $movie.series {
+                say "Found newer season: ", $movie.name;
+                my $newname = $*SPEC.catfile($search-dir, $movie.name);
+                say $newname;
+                $movie.io.copy($newname);
+            }
+            elsif $latest.series == $movie.series and $latest.episode < $movie.episode {
+                say "Found new epsiode; ", $movie.name;
+                my $newname = $*SPEC.catfile($search-dir, $movie.name);
+                say $newname;
+                $movie.io.copy($newname);
+            }
         }
     }
 }
