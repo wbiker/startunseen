@@ -2,10 +2,9 @@ use v6;
 
 unit class Config;
 
-method load($config-file-default-content) {
-    my $program = $*PROGRAM.basename;
+method load($config-file-default-content, $program-name) {
     my $config-dir = $*SPEC.catdir($*HOME, '.config');
-    my $config-program-dir = $*SPEC.catdir($config-dir, $*PROGRAM.basename);
+    my $config-program-dir = $*SPEC.catdir($config-dir, $program-name);
     my $config-program-file = $*SPEC.catfile($config-program-dir, 'config').IO;
 
     $config-program-dir.IO.mkdir unless $config-program-dir.IO.e;

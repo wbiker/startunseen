@@ -16,7 +16,7 @@ search-path = /home/wolf/vids/bigbangtheory;bang\.theory
 search-path = /home/wolf/vids/mythbusters;mythbuster
 END
 
-my %config = Config.load($config-file-content);
+my %config = Config.load($config-file-content, 'startunseen');
 my $download-dir = %config<download-dir>.IO;
 my $search-dirs = %config<search-path>;
 
